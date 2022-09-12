@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "odooshow"
+version = "0.1.0"
+description = "Make use of rich power tools to have nice formatted data in Odoo shells"
+authors = ["David Vidal <chienandalu@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.6.3,<4.0"
+rich = "^12.5.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
