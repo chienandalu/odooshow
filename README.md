@@ -12,9 +12,9 @@ partners = env["res.partner"].search([])  # Any recordset will do
 show(partners)
 ```
 
-Output:
+This would be the output:
 
-![Figure 1](./doc/img/fig_1.png)
+![Resulting table](./doc/img/fig_1.png)
 
 ## Installation
 
@@ -28,12 +28,10 @@ pip install odooshow
 
 ## Known issues / Roadmap
 
-- [BUG] Deterministic column order.
-- Better support for OdooRPC.
-- Make an Odoo module so we can plug the funcionality directly into the recordset.
+- Make an Odoo module so we can plug the funcionality directly into the model abstract.
+- Subfield values (AKA dynamic related values)
 - Now we can show some fields totals in the table footer but it would be great to have
   the possibility to show partial summaries when we're grouping by.
-- Format currency with proper symbol context.
-- Format dates (sometimes there can be glitches)
-- Table from `read` and `read_group`.
 - Congigurable column totals. Now we're getting them from the field info.
+- Better support for OdooRPC.
+- Refactor code.

@@ -9,7 +9,7 @@ console = Console()
 o_purple = "purple4"  # "#016b70"
 o_green = "sea_green1"  # "#694b61"
 
-__all__ = ["show"]
+__all__ = ["show", "show_read"]
 
 
 class OdooShow(object):
@@ -65,7 +65,25 @@ class OdooShow(object):
     def _one2many_format(cls):
         return cls._relation_format()
 
-    def _boolean_value(self, field, attrs=None):
+    def _monetary_value(self, field, attrs=None, record=None):
+        currency_field = attrs.get("currency_field")
+        if not currency_field:
+            return field
+        curr = record[currency_field]
+        return field and (
+            f"{curr.symbol if curr.position == 'before' else ''}"
+            f"{field:.{curr.decimal_places}f}"
+            f"{curr.symbol if curr.position == 'after' else ''}"
+            or ""
+        )
+
+    def _date_value(self, field, attrs=None, record=None):
+        return field and field.strftime("%Y-%m-%d") or ""
+
+    def _datetime_value(self, field, attrs=None, record=None):
+        return field and field.strftime("%Y-%m-%d %H:%M:%S") or ""
+
+    def _boolean_value(self, field, attrs=None, record=None):
         return ":heavy_check_mark:" if field else ""
 
     def _record_url(self, record):
@@ -75,20 +93,20 @@ class OdooShow(object):
             f"/web#model={record._name}&id={record.id}&view_type=form"
         )
 
-    def _relation_value(self, field_values, attrs=None):
+    def _relation_value(self, field_values, attrs=None, record=None):
         """Render related records"""
         record_values = [
             f"[link={self._record_url(r)}]{r.display_name}[/link]" for r in field_values
         ]
         return field_values and ", ".join(record_values) or ""
 
-    def _many2one_value(self, field, attrs=None):
+    def _many2one_value(self, field, attrs=None, record=None):
         return self._relation_value(field, attrs)
 
-    def _many2many_value(self, field, attrs=None):
+    def _many2many_value(self, field, attrs=None, record=None):
         return self._relation_value(field, attrs)
 
-    def _one2many_value(self, field, attrs=None):
+    def _one2many_value(self, field, attrs=None, record=None):
         return self._relation_value(field, attrs)
 
     def _filter_column(self, columns, header):
@@ -104,7 +122,7 @@ class OdooShow(object):
             row_values = []
             if empty_group_by_cell:
                 row_values.append("")
-            # Todo refactor a little bit
+            # Todo refactor a little bit so we don't repeat it in the columns as well
             if groupby:
                 groupby_attrs = records.fields_get().get(groupby)
                 if groupby_attrs:
@@ -125,12 +143,18 @@ class OdooShow(object):
                 empty_group_by_cell = True
             for field, attrs in fields.items():
                 method_name = f"_{attrs.get('type', '')}_value"
+                # OdooRPC is not always as flexible as the regular Odoo shell so we
+                # try to format the record values. Otherwise we throw it as it is
                 try:
-                    field = (
-                        method_name in self
-                        and getattr(self, method_name)(record[field], attrs)
-                        or record[field]
-                    )
+                    # We can click in the `id` number and go to the record directly!
+                    if field == "id":
+                        field = f"[link={self._record_url(record)}]{record.id}[/link]"
+                    else:
+                        field = (
+                            method_name in self
+                            and getattr(self, method_name)(record[field], attrs, record)
+                            or record[field]
+                        )
                 except Exception:
                     field = record
                 row_values.append(field and str(field) or "")
@@ -149,7 +173,7 @@ class OdooShow(object):
         groupby=None,
         **extra,
     ):
-        """Show recordset in a pretty way"""
+        """Compose the rich.table according to the recodset contents"""
         # Compatibility with OdooRPC to access the object fields properties
         records_obj = records.env[records._name]
         if fields:
@@ -166,8 +190,9 @@ class OdooShow(object):
         # Allways show the record id first
         fields = dict({"id": {"type": "integer"}}, **fields)
         tb_box = extra.pop("box", box.HORIZONTALS)
+        expand = extra.pop("expand", True)
         table = Table(
-            title=name, title_justify="left", expand=True, box=tb_box, **extra
+            title=name, title_justify="left", expand=expand, box=tb_box, **extra
         )
         # Header
         if groupby:
@@ -183,7 +208,6 @@ class OdooShow(object):
             justify, style = (
                 method_name in self and getattr(self, method_name)() or ("left", "")
             )
-            # TODO: Make them clickable!
             style = "dim" if field == "id" else style
             table.add_column(field, justify=justify, style=style)
         if extra.get("show_footer"):
@@ -220,6 +244,23 @@ def show(
     raw=None,
     **extra,
 ):
+    """Render an Odoo recorset as a table
+
+    :param records: Odoo recordset
+    :type records: recordset
+    :param fields: List of fields to render as columns
+    :type fields: list of str, optional
+    :param view_id: Default view xml_id
+    :type view_id: string, optional
+    :param view_type: Default view type, defaults to "tree"
+    :type view_type: str, optional
+    :param groupby: Field to groupby
+    :type groupby: str, optional
+    :param raw: Return a rich.table object
+    :type raw: boolean, optional
+    :return: rich.table
+    :rtype: rich.table
+    """
     odooshow = OdooShow()
     table = odooshow._show(
         records,
@@ -232,4 +273,19 @@ def show(
     # Users can tweak the rich.table object by themselves
     if raw:
         return table
+    console.print(table)
+
+
+def show_read(read_records):
+    """Naif method to pipe an Odoo model.read() into a rich.table
+
+    :param read_records: List of records read
+    :type read_records: list
+    """
+    table = Table()
+    fields = read_records[:1] and read_records[0].keys()
+    for field in fields:
+        table.add_column(field)
+    for record in read_records:
+        table.add_row(*[str(x) for x in record.values()])
     console.print(table)
