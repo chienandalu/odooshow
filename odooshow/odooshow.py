@@ -83,6 +83,10 @@ class OdooShow(object):
             or ""
         )
 
+    def _float_value(self, field, attrs=None, record=None):
+        prec = attrs.get("digits", (0, 2))
+        return f"{field:.{prec[1]}f}"
+
     def _date_value(self, field, attrs=None, record=None):
         return field and field.strftime("%Y-%m-%d") or ""
 
@@ -131,7 +135,7 @@ class OdooShow(object):
         try:
             value = (
                 method_name in self
-                and getattr(self, method_name)(record[field], attrs)
+                and getattr(self, method_name)(record[field], attrs, record)
                 or record[field]
             )
         # OdooRPC is not always as flexible as the regular Odoo shell so we try to
@@ -146,16 +150,25 @@ class OdooShow(object):
             for f, v in fields.items()
             if v.get("group_operator")
         }
-        for key, value in group_operator_fields.items():
-            if value not in GROUP_OPERATORS.keys():
+        for key, method in group_operator_fields.items():
+            if method not in GROUP_OPERATORS.keys():
                 continue
             column = self._filter_column(table.columns, key)
+            attrs = records.fields_get()[key]
+            f_type = attrs.get("type", "")
+            type_value_func = f"_{f_type}_value"
             # Only over a restricted set of operators.
-            value = str(GROUP_OPERATORS[value](records.mapped(key)))
+            value = GROUP_OPERATORS[method](records.mapped(key))
+            value = str(
+                type_value_func in self
+                and getattr(self, type_value_func)(value, attrs, records[0])
+                or value
+            )
             if partials:
-                column._cells[-1:] = value
+                column._cells.pop()
+                column._cells.append(value)
                 continue
-            column.footer = column.footer if not partials else column._cells[-1:]
+            column.footer = value
 
     def _render_record_rows(self, table, records, fields, groupby=None):
         empty_group_by_cell = False
@@ -196,10 +209,16 @@ class OdooShow(object):
         """Compose the rich.table according to the recodset contents"""
         # Some default values for the table
         tb_box = extra.pop("box", box.HORIZONTALS)
-        expand = extra.pop("expand", True)
-        partials = partials and groupby
+        expand = extra.pop("expand", False)
+        show_footer = extra.pop("show_footer", None)
+        partials = partials and groupby and show_footer
         table = Table(
-            title=name, title_justify="left", expand=expand, box=tb_box, **extra
+            title=name,
+            title_justify="left",
+            expand=expand,
+            box=tb_box,
+            show_footer=show_footer,
+            **extra,
         )
         # Compatibility with OdooRPC to access the object fields properties
         records_obj = records.env[records._name]
@@ -226,7 +245,7 @@ class OdooShow(object):
             justify, style = self._header_column_style(attrs)
             style = "dim" if field == "id" else style
             table.add_column(field, justify=justify, style=style)
-        if extra.get("show_footer"):
+        if show_footer:
             self._show_footer(fields, records, table)
         # Rows
         if not groupby:
@@ -236,8 +255,8 @@ class OdooShow(object):
             filtered_records = records.filtered(lambda x: x[groupby] == item)
             self._render_record_rows(table, filtered_records, fields, groupby)
             if partials:
-                table.add_row(*["" for x in fields], end_section=True)
-                self._show_footer(fields, records, table, partials)
+                table.add_row(*["" for _ in fields], end_section=True)
+                self._show_footer(fields, filtered_records, table, partials)
         return table
 
 
