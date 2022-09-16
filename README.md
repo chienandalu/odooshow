@@ -1,7 +1,7 @@
 # Odoo Show 🔎️
 
-Odoo Show is a python library that uses `rich` to give you goggles when you're diving
-into the Odoo Shell.
+Odoo Show is a python library that uses [`rich`](https://github.com/Textualize/rich) to
+give you goggles when you're diving into the Odoo Shell.
 
 Basic usage:
 
@@ -15,6 +15,10 @@ show(partners)
 This would be the output:
 
 ![Resulting table](./doc/img/fig_1.png)
+
+A small demo with the common usage of its features:
+
+[![asciicast](https://asciinema.org/a/525597.svg)](https://asciinema.org/a/525597)
 
 ## Installation
 

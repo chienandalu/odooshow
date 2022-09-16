@@ -2,17 +2,11 @@ import odoorpc
 
 from odooshow import show
 
-odoo = odoorpc.ODOO("localhost", port=14069)
+odoo = odoorpc.ODOO("localhost", port=13069)
 odoo.login("devel", "admin", "admin")
-user = odoo.env.user
+env = odoo.env
 
-sales = odoo.env["sale.order"].browse(odoo.env["sale.order"].search([], limit=4))
+s_ids = env["sale.order.line"].search([])
+sale_lines = env["sale.order.line"].browse(s_ids)
 
-show(sales, ["name", "partner_id", "amount_total"], show_footer=True)
-
-# show(
-#     sales,
-#     ["name", "partner_id", "state", "date_order", "amount_untaxed"],
-#     show_footer=True,
-#     expand=False,
-# )
+show(sale_lines, ["product_id"], show_footer=True)

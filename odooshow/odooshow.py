@@ -72,6 +72,13 @@ class OdooShow(object):
         return cls._relation_format()
 
     def _monetary_value(self, field, attrs=None, record=None):
+        """Format a monetary value with its currency symbol
+
+        :param any field: Field value
+        :param dict attrs: Field attributes, defaults to None
+        :param record record: Odoo record, defaults to None
+        :return str: Formatted value
+        """
         currency_field = attrs.get("currency_field")
         if not currency_field:
             return field
@@ -97,7 +104,11 @@ class OdooShow(object):
         return ":heavy_check_mark:" if field else ""
 
     def _record_url(self, record):
-        """Return a formatted link for relational records. Only supported terminals"""
+        """Return a formatted link for relational records. Only supported terminals
+
+        :param record record: Odoo record
+        :return str: Formatted url
+        """
         return (
             f"{record.get_base_url()}"
             f"/web#model={record._name}&id={record.id}&view_type=form"
@@ -120,16 +131,33 @@ class OdooShow(object):
         return self._relation_value(field, attrs)
 
     def _filter_column(self, columns, header):
-        """Get the header's column"""
+        """Filter a rich.table column by header content
+
+        :param rich.table.columns columns: Table columns
+        :param str header: Header content
+        :return rich.table.column: Filtered column
+        """
         for column in columns:
             if column.header == header:
                 return column
 
     def _header_column_style(self, attrs):
+        """Style column according to field attributes
+
+        :param dict attrs: Field attributes
+        :return tuple: (Alignment, Style)
+        """
         method_name = f"_{attrs.get('type', '')}_format"
         return method_name in self and getattr(self, method_name)() or ("left", "")
 
     def _cell_value(self, record, field, attrs):
+        """Cell value treatment and formatting
+
+        :param record record: Odoo record
+        :param str field: Field name
+        :param dict attrs: Field attributes
+        :return any: formatted value
+        """
         method_name = f"_{attrs.get('type', '')}_value"
         value = record[field]
         try:
@@ -145,6 +173,13 @@ class OdooShow(object):
         return value
 
     def _show_footer(self, fields, records, table, partials=False):
+        """Render total or partial footers
+
+        :param dict fields: Dictionary of fields
+        :param recordset records: Odoo Recordset
+        :param rich.table table: Rich Table
+        :param bool partials: Show partial footers, defaults to False
+        """
         group_operator_fields = {
             f: v.get("group_operator")
             for f, v in fields.items()
@@ -171,6 +206,13 @@ class OdooShow(object):
             column.footer = value
 
     def _render_record_rows(self, table, records, fields, groupby=None):
+        """For a given recordset and fields render the table rows
+
+        :param rich.table table: Table where we're appending the rows
+        :param recordset records: Odoo recordset
+        :param list fields: List of fields
+        :param str groupby: Field name to groupby, defaults to None
+        """
         empty_group_by_cell = False
         last_row = records[-1:]
         for record in records:
@@ -206,7 +248,17 @@ class OdooShow(object):
         partials=None,
         **extra,
     ):
-        """Compose the rich.table according to the recodset contents"""
+        """_summary_
+
+        :param recordset records: Any Odoo recordset
+        :param str name: Table name
+        :param list fields: List of fields to render as columns, defaults to None
+        :param int view_id: Default view id, defaults to None
+        :param str view_type: View type to take default fields form, defaults to "tree"
+        :param str groupby: Field name to group by records, defaults to None
+        :param bool partials: Show operator partials when grouping, defaults to None
+        :return rich.table: Rich Table Object
+        """
         # Some default values for the table
         tb_box = extra.pop("box", box.HORIZONTALS)
         expand = extra.pop("expand", False)
@@ -270,22 +322,16 @@ def show(
     partials=None,
     **extra,
 ):
-    """Render an Odoo recorset as a table
+    """Render an Odoo recordset as a table
 
-    :param records: Odoo recordset
-    :type records: recordset
-    :param fields: List of fields to render as columns
-    :type fields: list of str, optional
-    :param view_id: Default view xml_id
-    :type view_id: string, optional
-    :param view_type: Default view type, defaults to "tree"
-    :type view_type: str, optional
-    :param groupby: Field to groupby
-    :type groupby: str, optional
-    :param raw: Return a rich.table object
-    :type raw: boolean, optional
-    :return: rich.table
-    :rtype: rich.table
+    :param recordset records: Any Odoo recordset
+    :param list fields: List of fields to render as columns, defaults to None
+    :param int view_id: Default view id, defaults to None
+    :param str view_type: View type to take default fields form, defaults to "tree"
+    :param str groupby: Field name to group by records, defaults to None
+    :param boolean raw: Return a `rich.table` object instead of render, defaults to None
+    :param boolean partials: Show operator partials when grouping, defaults to None
+    :return rich.table: Rich Table Object
     """
     odooshow = OdooShow()
     table = odooshow._show(
@@ -306,8 +352,7 @@ def show(
 def show_read(read_records, raw=False, **extra):
     """Naif method to pipe an Odoo model.read() into a rich.table
 
-    :param read_records: List of records read
-    :type read_records: list
+    :param list partials: List of records read
     """
     # Default parameters
     tb_box = extra.pop("box", box.HORIZONTALS)
