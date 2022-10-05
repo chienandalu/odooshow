@@ -107,17 +107,26 @@ class OdooShow(object):
         """Return a formatted link for relational records. Only supported terminals
 
         :param record record: Odoo record
-        :return str: Formatted url
+        :return str: Formatted url or None
         """
-        return (
-            f"{record.get_base_url()}"
-            f"/web#model={record._name}&id={record.id}&view_type=form"
-        )
+
+        if not hasattr(record, "get_base_url"):
+            base_url = record.env['ir.config_parameter'].sudo().get_param('web.base.url')
+        else:
+            base_url = record.get_base_url()
+
+        if base_url:
+            return (
+                f"{base_url}"
+                f"/web#model={record._name}&id={record.id}&view_type=form"
+            )
+        else:
+            return None
 
     def _relation_value(self, field_values, attrs=None, record=None):
         """Render related records"""
         record_values = [
-            f"[link={self._record_url(r)}]{r.display_name}[/link]" for r in field_values
+            f"[link={self._record_url(r)}]{r.display_name}[/link]" if self._record_url(r) else f"{r.display_name}" for r in field_values
         ]
         return field_values and ", ".join(record_values) or ""
 
@@ -228,7 +237,11 @@ class OdooShow(object):
                 empty_group_by_cell = True
             for field, attrs in fields.items():
                 if field == "id":
-                    field = f"[link={self._record_url(record)}]{record.id}[/link]"
+                    record_url = self._record_url(record)
+                    if record_url is not None:
+                        field = f"[link={record_url}]{record.id}[/link]"
+                    else:
+                        field = f"{record.id}"
                 else:
                     field = self._cell_value(record, field, attrs)
                 row_values.append(field and str(field) or "")
