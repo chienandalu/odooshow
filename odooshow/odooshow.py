@@ -1,5 +1,7 @@
 # Copyright 2022 David Vidal
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl)
+import warnings
+
 from rich import box
 from rich.console import Console
 from rich.table import Table
@@ -111,14 +113,15 @@ class OdooShow(object):
         """
 
         if not hasattr(record, "get_base_url"):
-            base_url = record.env['ir.config_parameter'].sudo().get_param('web.base.url')
+            base_url = (
+                record.env["ir.config_parameter"].sudo().get_param("web.base.url")
+            )
         else:
             base_url = record.get_base_url()
 
         if base_url:
             return (
-                f"{base_url}"
-                f"/web#model={record._name}&id={record.id}&view_type=form"
+                f"{base_url}" f"/web#model={record._name}&id={record.id}&view_type=form"
             )
         else:
             return None
@@ -126,7 +129,10 @@ class OdooShow(object):
     def _relation_value(self, field_values, attrs=None, record=None):
         """Render related records"""
         record_values = [
-            f"[link={self._record_url(r)}]{r.display_name}[/link]" if self._record_url(r) else f"{r.display_name}" for r in field_values
+            f"[link={self._record_url(r)}]{r.display_name}[/link]"
+            if self._record_url(r)
+            else f"{r.display_name}"
+            for r in field_values
         ]
         return field_values and ", ".join(record_values) or ""
 
@@ -295,9 +301,12 @@ class OdooShow(object):
             }
         else:
             # Get fields from default tree view
-            fields = records_obj.fields_view_get(view_id=view_id, view_type=view_type)[
-                "fields"
-            ]
+            # Since v16 the method is deprecated. For the moment just silence warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fields = records_obj.fields_view_get(
+                    view_id=view_id, view_type=view_type
+                )["fields"]
         # Allways show the record id first
         fields = dict({"id": {"type": "integer"}}, **fields)
         # Header
