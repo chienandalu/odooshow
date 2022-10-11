@@ -30,9 +30,11 @@ To install with pip, simply:
 pip install odooshow
 ```
 
-## Known issues / Roadmap
+## Known issues
+
+- Better support for OdooRPC.
+
+## Roadmap
 
 - Make an Odoo module so we can plug the funcionality directly into the model abstract.
-- Subfield values (AKA dynamic related values)
-- Congigurable column totals. Now we're getting them from the field info.
-- Better support for OdooRPC.
+- Configurable column totals. Now we're getting them from the field info.

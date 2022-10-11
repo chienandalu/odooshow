@@ -20,6 +20,23 @@ GROUP_OPERATORS = {
 __all__ = ["show", "show_read"]
 
 
+def unpack_values(method):
+    """Decorator to unpack related field values"""
+
+    def _unpack_value(*args):
+        if isinstance(args[1], list):
+            return " / ".join([method(args[0], x, *args[2:]) for x in args[1]])
+
+    def wrapper(*args, **kwargs):
+        res = _unpack_value(*args)
+        if res:
+            return res
+        res = method(*args, **kwargs)
+        return res
+
+    return wrapper
+
+
 class OdooShow(object):
     """Trying to make Odoo devs' life easier!"""
 
@@ -73,6 +90,11 @@ class OdooShow(object):
     def _one2many_format(cls):
         return cls._relation_format()
 
+    @unpack_values
+    def _char_value(self, field, attrs=None, record=None):
+        return field
+
+    @unpack_values
     def _monetary_value(self, field, attrs=None, record=None):
         """Format a monetary value with its currency symbol
 
@@ -92,18 +114,22 @@ class OdooShow(object):
             or ""
         )
 
+    @unpack_values
     def _float_value(self, field, attrs=None, record=None):
         prec = attrs.get("digits", (0, 2))
         return f"{field:.{prec[1]}f}"
 
+    @unpack_values
     def _date_value(self, field, attrs=None, record=None):
         return field and field.strftime("%Y-%m-%d") or ""
 
+    @unpack_values
     def _datetime_value(self, field, attrs=None, record=None):
         return field and field.strftime("%Y-%m-%d %H:%M:%S") or ""
 
+    @unpack_values
     def _boolean_value(self, field, attrs=None, record=None):
-        return ":heavy_check_mark:" if field else ""
+        return ":heavy_check_mark:" if field else ":heavy_multiplication_x:"
 
     def _record_url(self, record):
         """Return a formatted link for relational records. Only supported terminals
@@ -174,12 +200,12 @@ class OdooShow(object):
         :return any: formatted value
         """
         method_name = f"_{attrs.get('type', '')}_value"
-        value = record[field]
+        value = record.mapped(field) if "." in field else record[field]
         try:
             value = (
                 method_name in self
-                and getattr(self, method_name)(record[field], attrs, record)
-                or record[field]
+                and getattr(self, method_name)(value, attrs, record)
+                or value
             )
         # OdooRPC is not always as flexible as the regular Odoo shell so we try to
         # format the record values. Otherwise we throw it as it is.
@@ -256,6 +282,29 @@ class OdooShow(object):
                 end_section=(groupby or empty_group_by_cell) and record == last_row,
             )
 
+    def _get_field_attributes(self, fields, records_obj):
+        """Gather fields info. Relations supported.
+
+        :param list fields: List of str: field names
+        :return dict: Dictionary of fields attributes
+        """
+        model_fields = records_obj.fields_get()
+        fields_attrs_dict = {}
+        for field in fields:
+            if "." in field:
+                relation_route = field.split(".")
+                relation_path = ".".join(relation_route[1:])
+                related_field_attrs = self._get_field_attributes(
+                    [relation_path], records_obj[relation_route[0]]
+                )
+                fields_attrs_dict.update(
+                    {field: related_field_attrs.get(relation_path, {})}
+                )
+                continue
+            if field in model_fields:
+                fields_attrs_dict.update({field: model_fields[field]})
+        return fields_attrs_dict
+
     def _show(
         self,
         records,
@@ -294,11 +343,7 @@ class OdooShow(object):
         # Compatibility with OdooRPC to access the object fields properties
         records_obj = records.env[records._name]
         if fields:
-            fields = {
-                key: value
-                for key, value in records_obj.fields_get().items()
-                if key in fields
-            }
+            fields = self._get_field_attributes(fields, records_obj)
         else:
             # Get fields from default tree view
             # Since v16 the method is deprecated. For the moment just silence warnings
