@@ -1,4 +1,4 @@
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 __author__ = "David Vidal"
 __email__ = "chienandalu@gmail.com"
 __doc__ = """A library to give goggles when diving into the Odoo Shell"""
