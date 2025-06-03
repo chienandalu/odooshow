@@ -1,5 +1,6 @@
 # Copyright 2022 David Vidal
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl)
+from odoo.release import major_version
 import warnings
 
 from rich import box
@@ -311,7 +312,7 @@ class OdooShow(object):
         name="",
         fields=None,
         view_id=None,
-        view_type="tree",
+        view_type="list",
         groupby=None,
         partials=None,
         **extra,
@@ -322,7 +323,7 @@ class OdooShow(object):
         :param str name: Table name
         :param list fields: List of fields to render as columns, defaults to None
         :param int view_id: Default view id, defaults to None
-        :param str view_type: View type to take default fields form, defaults to "tree"
+        :param str view_type: View type to take default fields form, defaults to "list"
         :param str groupby: Field name to group by records, defaults to None
         :param bool partials: Show operator partials when grouping, defaults to None
         :return rich.table: Rich Table Object
@@ -342,9 +343,16 @@ class OdooShow(object):
         )
         # Compatibility with OdooRPC to access the object fields properties
         records_obj = records.env[records._name]
+        # Ensure compatibility
+        if major_version < "18.0" and view_type == "list":
+            view_type = "tree"
+        if not fields and major_version >= "16.0":
+            fields = records_obj.get_view(
+                view_id=view_id, view_type=view_type
+            )["models"][records_obj._name]
         if fields:
             fields = self._get_field_attributes(fields, records_obj)
-        else:
+        elif major_version < "16.0":
             # Get fields from default tree view
             # Since v16 the method is deprecated. For the moment just silence warnings
             with warnings.catch_warnings():
@@ -383,7 +391,7 @@ def show(
     records,
     fields=None,
     view_id=None,
-    view_type="tree",
+    view_type="list",
     groupby=None,
     raw=None,
     partials=None,
@@ -394,7 +402,7 @@ def show(
     :param recordset records: Any Odoo recordset
     :param list fields: List of fields to render as columns, defaults to None
     :param int view_id: Default view id, defaults to None
-    :param str view_type: View type to take default fields form, defaults to "tree"
+    :param str view_type: View type to take default fields form, defaults to "list"
     :param str groupby: Field name to group by records, defaults to None
     :param boolean raw: Return a `rich.table` object instead of render, defaults to None
     :param boolean partials: Show operator partials when grouping, defaults to None
