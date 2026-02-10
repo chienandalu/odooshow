@@ -376,7 +376,9 @@ class OdooShow:
             self._render_record_rows(table, records, fields)
             return table
         for item in set(records.mapped(groupby)):
-            filtered_records = records.filtered(lambda x: x[groupby] == item)
+            filtered_records = records.filtered(
+                lambda x, item=item, groupby=groupby: x[groupby] == item
+            )
             self._render_record_rows(table, filtered_records, fields, groupby)
             if partials:
                 table.add_row(*["" for _ in fields], end_section=True)
