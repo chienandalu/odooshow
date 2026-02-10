@@ -11,12 +11,6 @@ rich = "^12.5.1"
 [tool.poetry.group.dev.dependencies]
 pytest = {version = "^8.0", python = ">=3.9"}
 
-[tool.poetry.group.integration]
-optional = true
-
-[tool.poetry.group.integration.dependencies]
-odoorpc = {version = "^0.10.1", python = ">=3.9"}
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

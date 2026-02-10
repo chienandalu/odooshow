@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -81,74 +81,113 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: latest
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Install dependencies
-        run: |
-          poetry install --no-interaction
-          poetry run pip install odoorpc
-
       - name: Pull Odoo Docker image
         run: docker pull odoo:${{ matrix.odoo-version }}
 
-      - name: Start Odoo container
+      - name: Initialize Odoo database
         run: |
-          docker run -d \
-            --name odoo \
+          docker run --rm \
+            --name odoo-init \
             --network host \
+            -v ${{ github.workspace }}:/mnt/odooshow \
             -e HOST=localhost \
             -e USER=odoo \
             -e PASSWORD=odoo \
             odoo:${{ matrix.odoo-version }} \
             -- --database=testdb --init=base --stop-after-init
 
-          # Wait for Odoo to initialize the database
-          echo "Waiting for Odoo to initialize database..."
-          timeout 300 docker wait odoo || true
-
-          # Start Odoo in normal mode
-          docker run -d \
-            --name odoo-server \
+      - name: Run integration tests inside Odoo container
+        run: |
+          docker run --rm \
+            --name odoo-test \
             --network host \
+            -v ${{ github.workspace }}:/mnt/odooshow \
             -e HOST=localhost \
             -e USER=odoo \
             -e PASSWORD=odoo \
             odoo:${{ matrix.odoo-version }} \
-            -- --database=testdb
-
-          # Wait for Odoo to be ready
-          echo "Waiting for Odoo to start..."
-          for i in {1..60}; do
-            if curl -s http://localhost:8069/web/database/selector | grep -q "testdb"; then
-              echo "Odoo is ready!"
-              break
-            fi
-            echo "Waiting... ($i/60)"
-            sleep 5
-          done
-
-      - name: Run integration tests
-        run: |
-          poetry run pytest tests/test_integration.py -v --tb=short
-        env:
-          ODOO_HOST: localhost
-          ODOO_PORT: 8069
-          ODOO_DATABASE: testdb
-          ODOO_USER: admin
-          ODOO_PASSWORD: admin
+            odoo shell --database=testdb --no-http << 'SHELL_SCRIPT'
+          
+          # Install odooshow from mounted volume
+          import subprocess
+          import sys
+          subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "/mnt/odooshow"])
+          
+          # Import and test odooshow
+          from odooshow import show, show_read
+          
+          print("=" * 60)
+          print("Testing odooshow with Odoo ${{ matrix.odoo-version }}")
+          print("=" * 60)
+          
+          # Test 1: show() with res.partner
+          print("\n[TEST 1] show() with res.partner")
+          partners = env["res.partner"].search([], limit=5)
+          partner_records = env["res.partner"].browse(partners)
+          table = show(partner_records, fields=["name", "email"], raw=True)
+          assert table is not None, "show() should return a table"
+          assert len(table.columns) >= 3, "Table should have at least 3 columns (id + 2 fields)"
+          print("✓ PASSED")
+          
+          # Test 2: show() with res.users
+          print("\n[TEST 2] show() with res.users")
+          users = env["res.users"].search([], limit=3)
+          user_records = env["res.users"].browse(users)
+          table = show(user_records, fields=["login", "name"], raw=True)
+          assert table is not None, "show() should return a table"
+          print("✓ PASSED")
+          
+          # Test 3: show() with empty recordset
+          print("\n[TEST 3] show() with empty recordset")
+          empty_partners = env["res.partner"].browse([])
+          table = show(empty_partners, fields=["name"], raw=True)
+          assert table is not None, "show() should handle empty recordset"
+          print("✓ PASSED")
+          
+          # Test 4: show() with boolean field
+          print("\n[TEST 4] show() with boolean field")
+          partners = env["res.partner"].search([], limit=3)
+          partner_records = env["res.partner"].browse(partners)
+          table = show(partner_records, fields=["name", "active"], raw=True)
+          assert table is not None, "show() should handle boolean fields"
+          print("✓ PASSED")
+          
+          # Test 5: show_read() function
+          print("\n[TEST 5] show_read() function")
+          partner_ids = env["res.partner"].search([], limit=5)
+          read_data = env["res.partner"].browse(partner_ids).read(["name", "email"])
+          table = show_read(read_data, raw=True)
+          assert table is not None, "show_read() should return a table"
+          assert len(table.columns) >= 2, "Table should have at least 2 columns"
+          print("✓ PASSED")
+          
+          # Test 6: show() with relational field (many2one)
+          print("\n[TEST 6] show() with many2one field")
+          partners = env["res.partner"].search([("parent_id", "!=", False)], limit=3)
+          if partners:
+              partner_records = env["res.partner"].browse(partners)
+              table = show(partner_records, fields=["name", "parent_id"], raw=True)
+              assert table is not None, "show() should handle many2one fields"
+              print("✓ PASSED")
+          else:
+              print("⊘ SKIPPED (no partners with parent_id)")
+          
+          # Test 7: show() renders to console (non-raw mode)
+          print("\n[TEST 7] show() renders to console")
+          partners = env["res.partner"].search([], limit=2)
+          partner_records = env["res.partner"].browse(partners)
+          result = show(partner_records, fields=["name"])
+          assert result is None, "show() without raw should return None (prints to console)"
+          print("✓ PASSED")
+          
+          print("\n" + "=" * 60)
+          print("All integration tests passed!")
+          print("=" * 60)
+          
+          SHELL_SCRIPT
 
       - name: Show Odoo logs on failure
         if: failure()
         run: |
-          docker logs odoo-server || true
-          docker logs odoo || true
+          docker logs odoo-init 2>&1 || true
+          docker logs odoo-test 2>&1 || true
