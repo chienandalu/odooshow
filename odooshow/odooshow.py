@@ -202,9 +202,10 @@ class OdooShow:
                 and getattr(self, method_name)(value, attrs, record)
                 or value
             )
-        # OdooRPC is not always as flexible as the regular Odoo shell so we try to
-        # format the record values. Otherwise we throw it as it is.
         except Exception:
+            # OdooRPC is not always as flexible as the regular Odoo shell so we try to
+            # format the record values. Otherwise we return the raw value.
+            # NOTE: Broad except is intentional to handle various OdooRPC edge cases.
             pass
         return value
 
