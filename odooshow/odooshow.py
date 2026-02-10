@@ -38,11 +38,8 @@ def unpack_values(method):
     return wrapper
 
 
-class OdooShow(object):
+class OdooShow:
     """Trying to make Odoo devs' life easier!"""
-
-    def __init__(self):
-        super().__init__()
 
     def __contains__(self, key):
         return hasattr(self, key)
@@ -147,11 +144,8 @@ class OdooShow(object):
             base_url = record.get_base_url()
 
         if base_url:
-            return (
-                f"{base_url}" f"/web#model={record._name}&id={record.id}&view_type=form"
-            )
-        else:
-            return None
+            return f"{base_url}/web#model={record._name}&id={record.id}&view_type=form"
+        return None
 
     def _relation_value(self, field_values, attrs=None, record=None):
         """Render related records"""
@@ -208,9 +202,10 @@ class OdooShow(object):
                 and getattr(self, method_name)(value, attrs, record)
                 or value
             )
-        # OdooRPC is not always as flexible as the regular Odoo shell so we try to
-        # format the record values. Otherwise we throw it as it is.
         except Exception:
+            # OdooRPC is not always as flexible as the regular Odoo shell so we try to
+            # format the record values. Otherwise we return the raw value.
+            # NOTE: Broad except is intentional to handle various OdooRPC edge cases.
             pass
         return value
 
@@ -228,7 +223,7 @@ class OdooShow(object):
             if v.get("group_operator")
         }
         for key, method in group_operator_fields.items():
-            if method not in GROUP_OPERATORS.keys():
+            if method not in GROUP_OPERATORS:
                 continue
             column = self._filter_column(table.columns, key)
             attrs = records.fields_get()[key]
@@ -242,6 +237,8 @@ class OdooShow(object):
                 or value
             )
             if partials:
+                # NOTE: Using private _cells attribute as Rich doesn't expose a public
+                # API for modifying individual cells. May break with Rich updates.
                 column._cells.pop()
                 column._cells.append(value)
                 continue
@@ -317,7 +314,7 @@ class OdooShow(object):
         partials=None,
         **extra,
     ):
-        """_summary_
+        """Render an Odoo recordset as a rich Table
 
         :param recordset records: Any Odoo recordset
         :param str name: Table name
@@ -360,7 +357,7 @@ class OdooShow(object):
                 fields = records_obj.fields_view_get(
                     view_id=view_id, view_type=view_type
                 )["fields"]
-        # Allways show the record id first
+        # Always show the record id first
         fields = dict({"id": {"type": "integer"}}, **fields)
         # Header
         if groupby:
@@ -379,7 +376,9 @@ class OdooShow(object):
             self._render_record_rows(table, records, fields)
             return table
         for item in set(records.mapped(groupby)):
-            filtered_records = records.filtered(lambda x: x[groupby] == item)
+            filtered_records = records.filtered(
+                lambda x, item=item, groupby=groupby: x[groupby] == item
+            )
             self._render_record_rows(table, filtered_records, fields, groupby)
             if partials:
                 table.add_row(*["" for _ in fields], end_section=True)
