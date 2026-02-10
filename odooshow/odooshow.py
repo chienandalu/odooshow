@@ -237,6 +237,8 @@ class OdooShow:
                 or value
             )
             if partials:
+                # NOTE: Using private _cells attribute as Rich doesn't expose a public
+                # API for modifying individual cells. May break with Rich updates.
                 column._cells.pop()
                 column._cells.append(value)
                 continue
