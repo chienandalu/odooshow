@@ -38,11 +38,8 @@ def unpack_values(method):
     return wrapper
 
 
-class OdooShow(object):
+class OdooShow:
     """Trying to make Odoo devs' life easier!"""
-
-    def __init__(self):
-        super().__init__()
 
     def __contains__(self, key):
         return hasattr(self, key)
