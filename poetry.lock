@@ -71,6 +71,19 @@ files = [
 ]
 
 [[package]]
+name = "odoorpc"
+version = "0.10.1"
+description = "OdooRPC is a Python package providing an easy way to pilot your Odoo servers through RPC."
+optional = false
+python-versions = "*"
+groups = ["integration"]
+markers = "python_version >= \"3.9\""
+files = [
+    {file = "OdooRPC-0.10.1-py2.py3-none-any.whl", hash = "sha256:a0900bdd5c989c414b1ef40dafccd9363f179312d9166d9486cf70c7c2f0dd44"},
+    {file = "OdooRPC-0.10.1.tar.gz", hash = "sha256:d0bc524c5b960781165575bad9c13d032d6f968c3c09276271045ddbbb483aa5"},
+]
+
+[[package]]
 name = "packaging"
 version = "21.3"
 description = "Core utilities for Python packages"
@@ -255,4 +268,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.6.3,<4.0"
-content-hash = "59b1b3b5f8fc1e06bbf6b408958d86d109293257861daea336c886b0481eaa38"
+content-hash = "dead7e793bf2e4b403759e4541ebf12beaa4f54e2076e59e3c8743c701dbe93c"

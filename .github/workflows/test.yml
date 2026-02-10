@@ -1,0 +1,154 @@
+name: 🧪 Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
+
+      - name: Run unit tests
+        run: poetry run pytest tests/test_odooshow.py -v --tb=short
+
+  integration-tests:
+    name: Integration Tests (Odoo ${{ matrix.odoo-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - odoo-version: "16.0"
+            python-version: "3.10"
+          - odoo-version: "17.0"
+            python-version: "3.10"
+          - odoo-version: "18.0"
+            python-version: "3.12"
+          - odoo-version: "19.0"
+            python-version: "3.12"
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-interaction
+          poetry run pip install odoorpc
+
+      - name: Pull Odoo Docker image
+        run: docker pull odoo:${{ matrix.odoo-version }}
+
+      - name: Start Odoo container
+        run: |
+          docker run -d \
+            --name odoo \
+            --network host \
+            -e HOST=localhost \
+            -e USER=odoo \
+            -e PASSWORD=odoo \
+            odoo:${{ matrix.odoo-version }} \
+            -- --database=testdb --init=base --stop-after-init
+
+          # Wait for Odoo to initialize the database
+          echo "Waiting for Odoo to initialize database..."
+          timeout 300 docker wait odoo || true
+
+          # Start Odoo in normal mode
+          docker run -d \
+            --name odoo-server \
+            --network host \
+            -e HOST=localhost \
+            -e USER=odoo \
+            -e PASSWORD=odoo \
+            odoo:${{ matrix.odoo-version }} \
+            -- --database=testdb
+
+          # Wait for Odoo to be ready
+          echo "Waiting for Odoo to start..."
+          for i in {1..60}; do
+            if curl -s http://localhost:8069/web/database/selector | grep -q "testdb"; then
+              echo "Odoo is ready!"
+              break
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 5
+          done
+
+      - name: Run integration tests
+        run: |
+          poetry run pytest tests/test_integration.py -v --tb=short
+        env:
+          ODOO_HOST: localhost
+          ODOO_PORT: 8069
+          ODOO_DATABASE: testdb
+          ODOO_USER: admin
+          ODOO_PASSWORD: admin
+
+      - name: Show Odoo logs on failure
+        if: failure()
+        run: |
+          docker logs odoo-server || true
+          docker logs odoo || true
