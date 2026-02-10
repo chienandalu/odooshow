@@ -144,11 +144,8 @@ class OdooShow:
             base_url = record.get_base_url()
 
         if base_url:
-            return (
-                f"{base_url}" f"/web#model={record._name}&id={record.id}&view_type=form"
-            )
-        else:
-            return None
+            return f"{base_url}/web#model={record._name}&id={record.id}&view_type=form"
+        return None
 
     def _relation_value(self, field_values, attrs=None, record=None):
         """Render related records"""
@@ -225,7 +222,7 @@ class OdooShow:
             if v.get("group_operator")
         }
         for key, method in group_operator_fields.items():
-            if method not in GROUP_OPERATORS.keys():
+            if method not in GROUP_OPERATORS:
                 continue
             column = self._filter_column(table.columns, key)
             attrs = records.fields_get()[key]
