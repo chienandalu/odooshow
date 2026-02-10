@@ -360,7 +360,7 @@ class OdooShow(object):
                 fields = records_obj.fields_view_get(
                     view_id=view_id, view_type=view_type
                 )["fields"]
-        # Allways show the record id first
+        # Always show the record id first
         fields = dict({"id": {"type": "integer"}}, **fields)
         # Header
         if groupby:
