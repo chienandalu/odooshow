@@ -311,7 +311,7 @@ class OdooShow:
         partials=None,
         **extra,
     ):
-        """_summary_
+        """Render an Odoo recordset as a rich Table
 
         :param recordset records: Any Odoo recordset
         :param str name: Table name
